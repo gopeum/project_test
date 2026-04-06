@@ -17,16 +17,32 @@ jobs:
       - name: 코드 가져오기
         uses: actions/checkout@v4
 
-      - name: Check OIDC token
+      # OIDC 토큰 URL 확인
+      - name: Check OIDC token URL
         run: |
           echo "Requesting OIDC token..."
           echo "${ACTIONS_ID_TOKEN_REQUEST_URL}"
 
+      # 실제 JWT 토큰 확인 (핵심)
+      - name: Get ID token (JWT)
+        run: |
+          echo "Fetching OIDC token..."
+          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL")
+          echo "$TOKEN"
+
+      # GitHub context 확인
+      - name: Debug GitHub context
+        run: |
+          echo "REPO: $GITHUB_REPOSITORY"
+          echo "REF: $GITHUB_REF"
+
+      # AWS 인증
       - name: AWS 인증 설정
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::302174038725:role/github-actions-basic
           aws-region: ap-northeast-2
 
+      # 최종 테스트
       - name: AWS 연결 테스트
         run: aws sts get-caller-identity
