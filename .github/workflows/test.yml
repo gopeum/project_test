@@ -17,10 +17,15 @@ jobs:
       - name: 코드 가져오기
         uses: actions/checkout@v4
 
+      - name: Check OIDC token
+        run: |
+          echo "Requesting OIDC token..."
+          echo "${ACTIONS_ID_TOKEN_REQUEST_URL}"
+
       - name: AWS 인증 설정
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::302174038725:role/github-actions-deploy-role
+          role-to-assume: arn:aws:iam::302174038725:role/github-actions-basic
           aws-region: ap-northeast-2
 
       - name: AWS 연결 테스트
