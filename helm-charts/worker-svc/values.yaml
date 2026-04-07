@@ -1,0 +1,20 @@
+replicaCount: 1
+
+image:
+  repository: 302174038725.dkr.ecr.ap-northeast-2.amazonaws.com/ticketing/worker-svc
+  tag: latest
+  pullPolicy: Always
+
+env:
+  REDIS_HOST: "your-redis-endpoint"
+  SQS_QUEUE_URL: "your-sqs-url"
+
+  # 필요하면 사용
+  DB_WRITER_HOST: "your-rds-endpoint"
+  DB_USER: "root"
+
+secret:
+  DB_PASSWORD: "your-password"
+
+autoscaling:
+  enabled: false

@@ -1,0 +1,27 @@
+replicaCount: 2
+
+image:
+  repository: 302174038725.dkr.ecr.ap-northeast-2.amazonaws.com/ticketing/reserv-svc
+  tag: latest
+  pullPolicy: Always
+
+service:
+  port: 5000
+
+env:
+  DB_WRITER_HOST: "your-rds-endpoint"
+  DB_READER_HOST: "your-rds-reader"
+  DB_USER: "root"
+
+  REDIS_HOST: "your-redis-endpoint"
+  SQS_QUEUE_URL: "your-sqs-url"
+
+secret:
+  DB_PASSWORD: "your-password"
+
+# 나중에 수정하기 (f->t)
+autoscaling:
+  enabled: false   
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70

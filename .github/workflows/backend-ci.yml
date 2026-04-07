@@ -1,0 +1,87 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+
+permissions:
+  id-token: write
+  contents: write
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: 302174038725.dkr.ecr.ap-northeast-2.amazonaws.com
+
+jobs:
+  build-and-deploy:
+    if: github.actor != 'github-actions'
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service: [event-svc, reserv-svc, worker-svc]
+
+    steps:
+      - name: 코드 가져오기
+        uses: actions/checkout@v4
+
+      # AWS OIDC 인증
+      - name: AWS 인증
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::302174038725:role/github-actions-oidc-new
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ECR 로그인
+      - name: ECR 로그인
+        run: |
+          aws ecr get-login-password \
+          | docker login --username AWS --password-stdin $ECR_REGISTRY
+
+      # 이미지 태그 생성
+      - name: 이미지 태그 생성
+        id: tag
+        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
+      # Docker build & push
+      - name: 이미지 빌드 & 푸시
+        run: |
+          IMAGE=$ECR_REGISTRY/ticketing/${{ matrix.service }}:${{ steps.tag.outputs.TAG }}
+
+          docker build -t $IMAGE ./services/${{ matrix.service }}
+          docker push $IMAGE
+
+      #Terraform output
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Output 가져오기
+        run: |
+          cd terraform
+          DB_PASSWORD=$(terraform output -raw db_password)
+
+          echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_ENV
+    
+      # values.yaml
+        run: |
+          FILE=helm-charts/${{ matrix.service }}/values.yaml
+
+          #이미지 태그 변경
+          sed -i "s/tag: .*/tag: ${{ steps.tag.outputs.TAG }}/" $FILE
+
+          # DB 비밀번호 주입
+          sed -i "s|DB_PASSWORD:.*|DB_PASSWORD: \"$DB_PASSWORD\"|" $FILE
+
+      # 변경사항 커밋 & 푸시
+      - name: Git 커밋 & 푸시
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          git add helm-charts/
+          git commit -m "update ${{ matrix.service }} image tag -> ${{ steps.tag.outputs.TAG }}" || echo "No changes"
+          git push

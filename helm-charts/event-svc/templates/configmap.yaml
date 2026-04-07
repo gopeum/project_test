@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-config
+
+data:
+  DB_WRITER_HOST: {{ .Values.env.DB_WRITER_HOST | quote }}
+  DB_READER_HOST: {{ .Values.env.DB_READER_HOST | quote }}
+  DB_USER: {{ .Values.env.DB_USER | quote }}
+
+  REDIS_HOST: {{ .Values.env.REDIS_HOST | quote }}
+  SQS_QUEUE_URL: {{ .Values.env.SQS_QUEUE_URL | quote }}
+
+  COGNITO_JSON: {{ .Values.env.COGNITO_JSON | quote }}
