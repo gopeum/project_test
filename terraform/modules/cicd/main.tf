@@ -42,11 +42,12 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
-# GitHub Actions IAM Role
+# 현재 AWS 계정 정보
 data "aws_caller_identity" "current" {}
 
+# GitHub Actions IAM Role
 resource "aws_iam_role" "github_actions" {
-  name = "ticketing-github-actions-role"
+  name = "ticketing-${var.env}-github-actions-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -68,6 +69,7 @@ resource "aws_iam_role" "github_actions" {
   })
 }
 
+# GitHub Actions 정책 (CI 전용)
 resource "aws_iam_role_policy" "github_actions" {
   name = "github-actions-policy"
   role = aws_iam_role.github_actions.id
@@ -85,26 +87,8 @@ resource "aws_iam_role_policy" "github_actions" {
           "ecr:PutImage",
           "ecr:InitiateLayerUpload",
           "ecr:UploadLayerPart",
-          "ecr:CompleteLayerUpload",
+          "ecr:CompleteLayerUpload"
         ]
-        Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "eks:DescribeCluster",
-          "eks:ListClusters",
-        ]
-        Resource = "arn:aws:eks:${var.aws_region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["s3:PutObject", "s3:DeleteObject", "s3:GetObject"]
-        Resource = "${var.s3_frontend_arn}/*"
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["cloudfront:CreateInvalidation"]
         Resource = "*"
       }
     ]
