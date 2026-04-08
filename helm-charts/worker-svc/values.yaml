@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: 302174038725.dkr.ecr.ap-northeast-2.amazonaws.com/ticketing/worker-svc
-  tag: latest
+  tag: v1
   pullPolicy: Always
 
 env:
