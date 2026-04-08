@@ -1,4 +1,4 @@
-replicaCount: 3
+replicaCount: 2
 
 image:
   repository: 302174038725.dkr.ecr.ap-northeast-2.amazonaws.com/ticketing/event-svc
