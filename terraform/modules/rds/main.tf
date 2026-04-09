@@ -39,3 +39,24 @@ resource "aws_db_instance" "reader" {
 
   tags = { Name = "ticketing-mysql-reader", Role = "replica", Environment = var.env }
 }
+
+# SSM Parameter - DB Writer Endpoint
+resource "aws_ssm_parameter" "db_writer_endpoint" {
+  name  = "/${var.env}/ticketing/db/writer-endpoint"
+  type  = "String"
+  value = aws_db_instance.writer.address
+}
+
+# SSM Parameter - DB Reader Endpoint
+resource "aws_ssm_parameter" "db_reader_endpoint" {
+  name  = "/${var.env}/ticketing/db/reader-endpoint"
+  type  = "String"
+  value = aws_db_instance.reader.address
+}
+
+# DB Password (Secure)
+resource "aws_ssm_parameter" "db_password" {
+  name  = "/${var.env}/ticketing/db/password"
+  type  = "SecureString"
+  value = var.db_password
+}

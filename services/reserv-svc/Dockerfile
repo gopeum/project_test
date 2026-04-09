@@ -5,10 +5,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY main.py .
+COPY . .
+COPY ../common ./common
+
+ENV PYTHONPATH=/app
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
 
-EXPOSE 3001
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3001"]
+EXPOSE 5000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]

@@ -16,6 +16,8 @@ spec:
         app: {{ .Release.Name }}
 
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+
       containers:
         - name: fastapi
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -23,8 +25,21 @@ spec:
 
           ports:
             - containerPort: 5000
+          
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
 
-          # 핵심 부분
+           readinessProbe:
+             httpGet:
+               path: /health
+               port: 5000
+             initialDelaySeconds: 5
+             periodSeconds: 5
+
           envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-config

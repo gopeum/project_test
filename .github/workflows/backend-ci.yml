@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "services/**"
+      - "helm-charts/**"
 
 permissions:
   id-token: write
@@ -16,7 +17,6 @@ env:
 
 jobs:
   build-and-deploy:
-    if: github.actor != 'github-actions'
     runs-on: ubuntu-latest
 
     strategy:
@@ -24,60 +24,66 @@ jobs:
         service: [event-svc, reserv-svc, worker-svc]
 
     steps:
-      - name: 코드 가져오기
+      # 코드 가져오기
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # AWS OIDC 인증
-      - name: AWS 인증
+      # AWS 인증 (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::302174038725:role/github-actions-oidc-new
           aws-region: ${{ env.AWS_REGION }}
 
       # ECR 로그인
-      - name: ECR 로그인
+      - name: Login to ECR
         run: |
           aws ecr get-login-password \
           | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-      # 이미지 태그 생성
-      - name: 이미지 태그 생성
+      # 태그 생성 (SHA + latest)
+      - name: Generate Tag
         id: tag
-        run: echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-
-      # Docker build & push
-      - name: 이미지 빌드 & 푸시
         run: |
-          IMAGE=$ECR_REGISTRY/ticketing/${{ matrix.service }}:${{ steps.tag.outputs.TAG }}
+          echo "TAG=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-          docker build -t $IMAGE ./services/${{ matrix.service }}
-          docker push $IMAGE
-
-      #Terraform output
-      - name: Terraform Init
+      # Docker Build
+      - name: Build Image
         run: |
-          cd terraform
-          terraform init
+          IMAGE=$ECR_REGISTRY/ticketing/${{ matrix.service }}
 
-      - name: Terraform Output 가져오기
+          docker build \
+             -t $IMAGE:${{ steps.tag.outputs.TAG }} \
+             -t $IMAGE:latest \
+             -f services/${{ matrix.service }}/Dockerfile \
+             .
+
+      # Trivy Scan
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/ticketing/${{ matrix.service }}:${{ steps.tag.outputs.TAG }}
+          format: table
+          exit-code: 0
+          ignore-unfixed: true
+          severity: CRITICAL
+
+      # ECR Push
+      - name: Push Image
         run: |
-          cd terraform
-          DB_PASSWORD=$(terraform output -raw db_password)
+          IMAGE=$ECR_REGISTRY/ticketing/${{ matrix.service }}
+          docker push $IMAGE:${{ steps.tag.outputs.TAG }}
+          docker push $IMAGE:latest
 
-          echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_ENV
-    
-      # values.yaml
+      # Helm values.yaml 업데이트 (only 이미지 태그)
+      - name: Update Helm values
         run: |
           FILE=helm-charts/${{ matrix.service }}/values.yaml
 
-          #이미지 태그 변경
           sed -i "s/tag: .*/tag: ${{ steps.tag.outputs.TAG }}/" $FILE
 
-          # DB 비밀번호 주입
-          sed -i "s|DB_PASSWORD:.*|DB_PASSWORD: \"$DB_PASSWORD\"|" $FILE
-
-      # 변경사항 커밋 & 푸시
-      - name: Git 커밋 & 푸시
+      # Git commit & push (ArgoCD 트리거)
+      - name: Commit & Push
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"

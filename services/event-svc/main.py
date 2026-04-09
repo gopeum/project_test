@@ -3,15 +3,37 @@ from contextlib import asynccontextmanager
 import aiomysql
 import redis
 import os
+import boto3
+
+# SSM 설정
+SSM_PREFIX = os.getenv("SSM_PREFIX", "/prod/ticketing")
+
+def get_ssm_parameter(name):
+    client = boto3.client("ssm", region_name="ap-northeast-2")
+    response = client.get_parameter(Name=name, WithDecryption=True)
+    return response["Parameter"]["Value"]
+
+def get_config(key):
+    value = os.getenv(key)
+    if value:
+        return value
+
+    try:
+        ssm_key = f"{SSM_PREFIX}/{key.lower().replace('_', '-')}"
+        return get_ssm_parameter(ssm_key)
+    except Exception as e:
+        print(f"SSM fallback 실패: {e}")
+        return None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # DB 연결 (실패해도 죽지 않음)
+    # DB 연결
     try:
         app.state.db_pool = await aiomysql.create_pool(
-            host=os.getenv("DB_WRITER_HOST"),
+            host=get_config("DB_WRITER_HOST"),
             user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
+            password=get_config("DB_PASSWORD"),
             db="ticketing",
             autocommit=True
         )
@@ -20,10 +42,10 @@ async def lifespan(app: FastAPI):
         print("❌ DB 연결 실패 (무시):", e)
         app.state.db_pool = None
 
-    # Redis 연결 (실패해도 죽지 않음)
+    # Redis 연결
     try:
         app.state.redis = redis.Redis(
-            host=os.getenv("REDIS_HOST"),
+            host=get_config("REDIS_HOST"),
             port=6379,
             decode_responses=True
         )
@@ -39,9 +61,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 
-# 🔥 헬스체크 (핵심)
 @app.get("/health")
-def health():
+async def health():
     return {"status": "ok", "service": "event-svc"}
 
 

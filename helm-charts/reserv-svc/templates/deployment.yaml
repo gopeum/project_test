@@ -1,26 +1,59 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Chart.Name }}
+  name: {{ .Release.Name }}
+
 spec:
   replicas: {{ .Values.replicaCount }}
+
   selector:
     matchLabels:
-      app: {{ .Chart.Name }}
+      app: {{ .Release.Name }}
+
   template:
     metadata:
       labels:
-        app: {{ .Chart.Name }}
+        app: {{ .Release.Name }}
+
     spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ .Release.Name }}
+
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+
           ports:
             - containerPort: {{ .Values.service.port }}
 
+          # health check
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+
+          # 환경변수
           envFrom:
             - configMapRef:
-                name: {{ .Chart.Name }}-config
+                name: {{ .Release.Name }}-config
             - secretRef:
-                name: {{ .Chart.Name }}-secret
+                name: {{ .Release.Name }}-secret
+
+          # 안정성
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
